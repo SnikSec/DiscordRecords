@@ -1,0 +1,17 @@
+{
+    "discord_token": "",
+    "bot_prefix": "!",
+    "spotify": {
+        "client_id": "",
+        "client_secret": ""
+    },
+    "anthropic": {
+        "api_key": ""
+    },
+    "bot_settings": {
+        "default_volume": 50,
+        "max_queue_size": 100,
+        "timeout_seconds": 300,
+        "enable_auto_disconnect": true
+    }
+}
