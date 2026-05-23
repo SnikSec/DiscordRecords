@@ -80,6 +80,11 @@ class MusicPlayer:
             'no_warnings': True,
             'default_search': 'auto',
             'source_address': '0.0.0.0',
+            'age_limit': 99,
+            'geo_bypass': True,
+            'cookiesfrombrowser': ('chrome',),
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+            'remote_components': 'ejs:github',
         }
         
         self.ffmpeg_options = {
@@ -131,12 +136,10 @@ class MusicPlayer:
             source = interpreted_query.get('preferred_source', 'youtube')
             query_type = interpreted_query.get('type', 'search')
             search_query = interpreted_query.get('search_query', '')
-            duration_minutes = interpreted_query.get('duration_minutes', 0)
             
-            # Handle background/continuous play requests
+            # Treat background as genre for !play (background only via !background command)
             if query_type == 'background':
-                await self._start_background_play(ctx, search_query, duration_minutes)
-                return
+                query_type = 'genre'
             
             songs_to_add = []
             
@@ -293,8 +296,19 @@ class MusicPlayer:
             else:
                 await ctx.send(f"✅ Added **{len(songs_to_add)}** songs to the queue!")
             
-            # Start playing if not already playing
-            if not ctx.voice_client.is_playing():
+            # If background music is playing, interrupt it to play user's request
+            current = self.current_song.get(guild_id)
+            is_background_playing = (
+                ctx.voice_client.is_playing() and
+                current and current.source == 'background'
+            )
+            
+            if is_background_playing:
+                # Put current background song back in background queue
+                bg_queue = self.get_background_queue(guild_id)
+                bg_queue.insert(0, current)
+                ctx.voice_client.stop()  # This triggers after callback → play_next → picks user queue
+            elif not ctx.voice_client.is_playing():
                 await self.play_next(ctx)
         
         except Exception as e:
@@ -336,12 +350,20 @@ class MusicPlayer:
                 else:
                     return {
                         'title': info.get('title', 'Unknown'),
-                        'url': info.get('url', ''),
+                        'url': info.get('url', '') or url,  # Fall back to page URL
                         'duration': info.get('duration', 0),
                         'thumbnail': info.get('thumbnail', '')
                     }
         except Exception as e:
             print(f"Error extracting song info: {e}")
+            # For direct URLs, return basic info so play_next can try to extract the stream
+            if 'youtube.com/watch' in url or 'youtu.be/' in url:
+                return {
+                    'title': 'YouTube Video',
+                    'url': url,
+                    'duration': 0,
+                    'thumbnail': ''
+                }
             return None
     
     async def play_next(self, ctx: commands.Context):
@@ -436,7 +458,7 @@ class MusicPlayer:
                     duration=int(info.get('duration', 0)),
                     thumbnail=info.get('thumbnail', ''),
                     requester=ctx.author,
-                    source='youtube'
+                    source='background'
                 )
                 bg_queue = self.get_background_queue(guild_id)
                 bg_queue.append(song)
@@ -489,7 +511,7 @@ class MusicPlayer:
                         duration=0,
                         thumbnail='',
                         requester=ctx.author,
-                        source='youtube'
+                        source='background'
                     )
                     bg_queue.append(song)
                     count += 1

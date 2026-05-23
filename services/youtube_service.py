@@ -18,7 +18,17 @@ class YouTubeService:
             'default_search': 'ytsearch',
             'extract_flat': True,  # Don't download, just get info
             'nocheckcertificate': True,
+            'cookiesfrombrowser': ('chrome',),
+            'remote_components': 'ejs:github',
         }
+    
+    def _is_valid_video_id(self, video_id: str) -> bool:
+        """Check if a YouTube ID is a valid video ID (not a channel/playlist)"""
+        if not video_id:
+            return False
+        if video_id.startswith(('UC', 'PL', 'VL', 'RD', 'FL', 'UU')):
+            return False
+        return True
     
     async def search(self, query: str, limit: int = 5, music_only: bool = True) -> Optional[str]:
         """
@@ -41,10 +51,10 @@ class YouTubeService:
                         info = ytdl.extract_info(search_query, download=False)
                         if 'entries' in info and info['entries']:
                             for video in info['entries']:
-                                if video and video.get('id') and len(video['id']) == 11:
+                                if video and video.get('id') and self._is_valid_video_id(video['id']):
                                     return f"https://www.youtube.com/watch?v={video['id']}"
-                    except Exception:
-                        pass  # Fall through to regular search
+                    except Exception as e:
+                        print(f"Music search failed for '{query}': {e}")
                 
                 # Fallback to regular YouTube search
                 search_query = f"ytsearch{limit}:{query}"
@@ -52,12 +62,13 @@ class YouTubeService:
                 
                 if 'entries' in info and info['entries']:
                     for video in info['entries']:
-                        if video and video.get('id') and len(video['id']) == 11:
+                        if video and video.get('id') and self._is_valid_video_id(video['id']):
                             return f"https://www.youtube.com/watch?v={video['id']}"
                 
+                print(f"No results found for: {query}")
                 return None
         except Exception as e:
-            print(f"Error searching YouTube: {e}")
+            print(f"Error searching YouTube for '{query}': {e}")
             return None
     
     async def get_video_info(self, url: str) -> Optional[dict]:

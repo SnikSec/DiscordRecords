@@ -117,6 +117,54 @@ async def pause(ctx):
     await music_player.pause(ctx)
 
 
+@bot.command(name='background', aliases=['bg'])
+async def background(ctx, *, query: str = None):
+    """
+    Set background music that plays when the queue is empty.
+    User queue (!play) always takes priority.
+    
+    Examples:
+        !background tavern music
+        !background chill lofi
+        !background stop
+        !background (shows current theme)
+    """
+    if not ctx.author.voice:
+        await ctx.send("❌ You need to be in a voice channel!")
+        return
+    
+    guild_id = ctx.guild.id
+    
+    if query is None:
+        # Show current background theme
+        theme = music_player.background_theme.get(guild_id)
+        if theme:
+            await ctx.send(f"🎶 Current background theme: **{theme}**")
+        else:
+            await ctx.send("No background music set. Use `!background <theme>` to set one.")
+        return
+    
+    if query.lower() == 'stop':
+        music_player.background_queues.pop(guild_id, None)
+        music_player.background_theme.pop(guild_id, None)
+        await ctx.send("⏹️ Background music stopped.")
+        return
+    
+    # Connect to voice if needed
+    if not ctx.voice_client:
+        await ctx.author.voice.channel.connect(self_deaf=True, timeout=15.0)
+    
+    # Parse duration if included
+    import re
+    duration_minutes = 0
+    duration_match = re.search(r'(\d+)\s*hours?', query.lower())
+    if duration_match:
+        duration_minutes = int(duration_match.group(1)) * 60
+        query = re.sub(r'for\s+\d+\s*hours?', '', query).strip()
+    
+    await music_player._start_background_play(ctx, query, duration_minutes)
+
+
 @bot.command(name='resume')
 async def resume(ctx):
     """Resume paused playback"""
