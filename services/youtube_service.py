@@ -27,24 +27,24 @@ class YouTubeService:
         Args:
             query: Search query
             limit: Number of results to fetch (picks first valid one)
-            music_only: If True, search YouTube Music instead of regular YouTube
+            music_only: If True, bias search toward music content
             
         Returns:
             Video URL or None if not found
         """
         try:
             with yt_dlp.YoutubeDL(self.ytdl_options) as ytdl:
-                # Use YouTube Music search for music content
+                # Search with music-biased terms first
                 if music_only:
-                    search_query = f"https://music.youtube.com/search?q={query}"
+                    search_query = f"ytsearch{limit}:{query} official audio"
                     try:
                         info = ytdl.extract_info(search_query, download=False)
                         if 'entries' in info and info['entries']:
                             for video in info['entries']:
-                                if video and video.get('id'):
+                                if video and video.get('id') and len(video['id']) == 11:
                                     return f"https://www.youtube.com/watch?v={video['id']}"
                     except Exception:
-                        pass  # Fall through to regular YouTube search
+                        pass  # Fall through to regular search
                 
                 # Fallback to regular YouTube search
                 search_query = f"ytsearch{limit}:{query}"
@@ -52,7 +52,7 @@ class YouTubeService:
                 
                 if 'entries' in info and info['entries']:
                     for video in info['entries']:
-                        if video and video.get('id'):
+                        if video and video.get('id') and len(video['id']) == 11:
                             return f"https://www.youtube.com/watch?v={video['id']}"
                 
                 return None

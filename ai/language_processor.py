@@ -100,41 +100,24 @@ class LanguageProcessor:
     async def _interpret_with_ai(self, query: str) -> Dict:
         """Use AI to interpret the query (supports OpenAI and Anthropic)"""
         
-        prompt = f"""You are a music query interpreter for a Discord bot that plays music from Spotify and YouTube.
+        prompt = f"""Music query interpreter. Parse this request into structured format.
+Request: "{query}"
 
-Analyze this user request and provide a structured interpretation:
-"{query}"
+Reply EXACTLY as:
+TYPE: search|playlist|genre|background
+QUERY: <search terms>
+SOURCE: spotify|youtube
+DURATION: <minutes if mentioned, else 0>
 
-Your response should help the bot understand:
-1. What type of request this is (specific song, playlist, genre/mood, artist)
-2. What to search for
-3. Whether Spotify or YouTube would be better
-
-Types:
-- search: a specific song or artist lookup
-- playlist: the user wants a playlist (multiple songs on a theme, or a named playlist)
-- genre: general genre/mood/vibe music
-
-Source guidance:
-- Use "spotify" for named artists, specific songs, or when user says "spotify"
-- Use "youtube" for ambient/background music, livestreams, mixes, or when user says "youtube"
-- If user mentions "playlist" without a direct Spotify URL, use "spotify" if it sounds like a known playlist name, or "youtube" if it's a vibe/mood playlist
-
-Respond in this exact format:
-TYPE: [search/playlist/genre]
-QUERY: [the exact search query to use]
-DESCRIPTION: [brief description of what the user wants]
-SOURCE: [spotify/youtube]
+Rules: spotify for named songs/artists/playlists. youtube for mixes/ambient/vibes/background.
+Use TYPE background when user wants extended/continuous play (mentions time, hours, "for a while", "background music").
 
 Examples:
-- "play some DnD tavern music" → TYPE: genre, QUERY: dungeons and dragons tavern medieval fantasy music, DESCRIPTION: Fantasy tavern background music, SOURCE: youtube
-- "play Shape of You" → TYPE: search, QUERY: Shape of You Ed Sheeran, DESCRIPTION: Shape of You by Ed Sheeran, SOURCE: spotify
-- "chill lofi beats" → TYPE: genre, QUERY: lofi hip hop chill beats, DESCRIPTION: Relaxing lo-fi hip hop, SOURCE: youtube
-- "queue up a rock workout playlist" → TYPE: playlist, QUERY: rock workout, DESCRIPTION: Rock workout playlist, SOURCE: spotify
-- "play the top 50 global playlist" → TYPE: playlist, QUERY: Top 50 Global, DESCRIPTION: Spotify Top 50 Global playlist, SOURCE: spotify
-- "play a 90s hip hop mix" → TYPE: playlist, QUERY: 90s hip hop mix, DESCRIPTION: 90s hip hop mix, SOURCE: youtube
-
-Now analyze: "{query}" """
+"DnD tavern music" → TYPE: genre QUERY: dungeons and dragons tavern music SOURCE: youtube DURATION: 0
+"Shape of You" → TYPE: search QUERY: Shape of You Ed Sheeran SOURCE: spotify DURATION: 0
+"rock workout playlist" → TYPE: playlist QUERY: rock workout SOURCE: spotify DURATION: 0
+"tavern music for 4 hours" → TYPE: background QUERY: tavern music SOURCE: youtube DURATION: 240
+"play chill vibes for a while" → TYPE: background QUERY: chill vibes SOURCE: youtube DURATION: 120"""
 
         if self.provider == 'openai':
             response_text = await self._call_openai(prompt)
@@ -144,14 +127,15 @@ Now analyze: "{query}" """
         # Parse the response
         type_match = re.search(r'TYPE:\s*(\w+)', response_text, re.IGNORECASE)
         query_match = re.search(r'QUERY:\s*(.+?)(?:\n|$)', response_text, re.IGNORECASE)
-        desc_match = re.search(r'DESCRIPTION:\s*(.+?)(?:\n|$)', response_text, re.IGNORECASE)
         source_match = re.search(r'SOURCE:\s*(\w+)', response_text, re.IGNORECASE)
+        duration_match = re.search(r'DURATION:\s*(\d+)', response_text, re.IGNORECASE)
         
         return {
             'type': type_match.group(1).lower() if type_match else 'search',
             'search_query': query_match.group(1).strip() if query_match else query,
-            'description': desc_match.group(1).strip() if desc_match else query,
-            'preferred_source': source_match.group(1).lower() if source_match else 'youtube'
+            'description': query,
+            'preferred_source': source_match.group(1).lower() if source_match else 'youtube',
+            'duration_minutes': int(duration_match.group(1)) if duration_match else 0
         }
 
     async def _call_openai(self, prompt: str) -> str:
@@ -180,6 +164,29 @@ Now analyze: "{query}" """
         """Fallback interpretation using keyword matching"""
         query_lower = query.lower()
         
+        # Check for duration/background requests
+        duration_minutes = 0
+        duration_match = re.search(r'(\d+)\s*hours?', query_lower)
+        if duration_match:
+            duration_minutes = int(duration_match.group(1)) * 60
+        else:
+            duration_match = re.search(r'(\d+)\s*min', query_lower)
+            if duration_match:
+                duration_minutes = int(duration_match.group(1))
+        
+        is_background = duration_minutes > 0 or any(w in query_lower for w in ['for a while', 'background', 'all night', 'all day'])
+        
+        if is_background:
+            # Strip duration text from search query
+            clean_query = re.sub(r'for\s+(\d+\s*hours?|\d+\s*min\w*|a while|all night|all day)', '', query_lower).strip()
+            return {
+                'type': 'background',
+                'search_query': clean_query or query,
+                'description': query,
+                'preferred_source': 'youtube',
+                'duration_minutes': duration_minutes or 120
+            }
+        
         # Check for activity-based requests (like "DnD tavern music")
         for activity in self.activity_keywords:
             if activity in query_lower:
@@ -187,7 +194,8 @@ Now analyze: "{query}" """
                     'type': 'genre',
                     'search_query': f"{query} music",
                     'description': f"{query.title()} music",
-                    'preferred_source': 'youtube'
+                    'preferred_source': 'youtube',
+                    'duration_minutes': 0
                 }
         
         # Check for genre keywords
