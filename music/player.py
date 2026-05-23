@@ -82,7 +82,6 @@ class MusicPlayer:
             'source_address': '0.0.0.0',
             'age_limit': 99,
             'geo_bypass': True,
-            'cookiesfrombrowser': ('chrome',),
             'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
             'remote_components': 'ejs:github',
         }

@@ -18,7 +18,6 @@ class YouTubeService:
             'default_search': 'ytsearch',
             'extract_flat': True,  # Don't download, just get info
             'nocheckcertificate': True,
-            'cookiesfrombrowser': ('chrome',),
             'remote_components': 'ejs:github',
         }
     
