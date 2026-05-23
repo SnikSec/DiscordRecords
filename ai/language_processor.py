@@ -1,28 +1,48 @@
 """
 Language Processor
 Uses AI to interpret natural language music requests
+Supports both OpenAI and Anthropic as providers.
 """
 import os
 import re
 from typing import Dict
-import anthropic
+
+try:
+    import openai
+except ImportError:
+    openai = None
+
+try:
+    import anthropic
+except ImportError:
+    anthropic = None
 
 
 class LanguageProcessor:
     """Process natural language queries for music requests"""
     
     def __init__(self):
-        """Initialize the language processor"""
-        self.api_key = os.getenv('ANTHROPIC_API_KEY')
-        
-        if self.api_key:
-            self.client = anthropic.Anthropic(api_key=self.api_key)
+        """Initialize the language processor with available AI provider"""
+        self.provider = None
+        self.client = None
+        self.enabled = False
+
+        openai_key = os.getenv('OPENAI_API_KEY')
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+
+        # Prefer OpenAI if available, fall back to Anthropic
+        if openai_key and openai:
+            self.client = openai.OpenAI(api_key=openai_key)
+            self.provider = 'openai'
             self.enabled = True
-            print("✅ AI language processing enabled")
+            print("✅ AI language processing enabled (OpenAI)")
+        elif anthropic_key and anthropic:
+            self.client = anthropic.Anthropic(api_key=anthropic_key)
+            self.provider = 'anthropic'
+            self.enabled = True
+            print("✅ AI language processing enabled (Anthropic)")
         else:
-            self.client = None
-            self.enabled = False
-            print("⚠️ ANTHROPIC_API_KEY not found - Using basic keyword matching")
+            print("⚠️ No AI API key found - Using basic keyword matching")
         
         # Keyword patterns for fallback
         self.genre_keywords = {
@@ -78,7 +98,7 @@ class LanguageProcessor:
         return self._interpret_with_keywords(query)
     
     async def _interpret_with_ai(self, query: str) -> Dict:
-        """Use Claude to interpret the query"""
+        """Use AI to interpret the query (supports OpenAI and Anthropic)"""
         
         prompt = f"""You are a music query interpreter for a Discord bot that plays music from Spotify and YouTube.
 
@@ -90,8 +110,18 @@ Your response should help the bot understand:
 2. What to search for
 3. Whether Spotify or YouTube would be better
 
+Types:
+- search: a specific song or artist lookup
+- playlist: the user wants a playlist (multiple songs on a theme, or a named playlist)
+- genre: general genre/mood/vibe music
+
+Source guidance:
+- Use "spotify" for named artists, specific songs, or when user says "spotify"
+- Use "youtube" for ambient/background music, livestreams, mixes, or when user says "youtube"
+- If user mentions "playlist" without a direct Spotify URL, use "spotify" if it sounds like a known playlist name, or "youtube" if it's a vibe/mood playlist
+
 Respond in this exact format:
-TYPE: [search/playlist/genre/mood]
+TYPE: [search/playlist/genre]
 QUERY: [the exact search query to use]
 DESCRIPTION: [brief description of what the user wants]
 SOURCE: [spotify/youtube]
@@ -100,25 +130,22 @@ Examples:
 - "play some DnD tavern music" → TYPE: genre, QUERY: dungeons and dragons tavern medieval fantasy music, DESCRIPTION: Fantasy tavern background music, SOURCE: youtube
 - "play Shape of You" → TYPE: search, QUERY: Shape of You Ed Sheeran, DESCRIPTION: Shape of You by Ed Sheeran, SOURCE: spotify
 - "chill lofi beats" → TYPE: genre, QUERY: lofi hip hop chill beats, DESCRIPTION: Relaxing lo-fi hip hop, SOURCE: youtube
-- "play my Discover Weekly" → TYPE: playlist, QUERY: Discover Weekly, DESCRIPTION: Spotify Discover Weekly playlist, SOURCE: spotify
+- "queue up a rock workout playlist" → TYPE: playlist, QUERY: rock workout, DESCRIPTION: Rock workout playlist, SOURCE: spotify
+- "play the top 50 global playlist" → TYPE: playlist, QUERY: Top 50 Global, DESCRIPTION: Spotify Top 50 Global playlist, SOURCE: spotify
+- "play a 90s hip hop mix" → TYPE: playlist, QUERY: 90s hip hop mix, DESCRIPTION: 90s hip hop mix, SOURCE: youtube
 
 Now analyze: "{query}" """
 
-        message = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=300,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-        
-        response = message.content[0].text
+        if self.provider == 'openai':
+            response_text = await self._call_openai(prompt)
+        else:
+            response_text = await self._call_anthropic(prompt)
         
         # Parse the response
-        type_match = re.search(r'TYPE:\s*(\w+)', response, re.IGNORECASE)
-        query_match = re.search(r'QUERY:\s*(.+?)(?:\n|$)', response, re.IGNORECASE)
-        desc_match = re.search(r'DESCRIPTION:\s*(.+?)(?:\n|$)', response, re.IGNORECASE)
-        source_match = re.search(r'SOURCE:\s*(\w+)', response, re.IGNORECASE)
+        type_match = re.search(r'TYPE:\s*(\w+)', response_text, re.IGNORECASE)
+        query_match = re.search(r'QUERY:\s*(.+?)(?:\n|$)', response_text, re.IGNORECASE)
+        desc_match = re.search(r'DESCRIPTION:\s*(.+?)(?:\n|$)', response_text, re.IGNORECASE)
+        source_match = re.search(r'SOURCE:\s*(\w+)', response_text, re.IGNORECASE)
         
         return {
             'type': type_match.group(1).lower() if type_match else 'search',
@@ -126,6 +153,28 @@ Now analyze: "{query}" """
             'description': desc_match.group(1).strip() if desc_match else query,
             'preferred_source': source_match.group(1).lower() if source_match else 'youtube'
         }
+
+    async def _call_openai(self, prompt: str) -> str:
+        """Call OpenAI API"""
+        import asyncio
+        response = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                max_tokens=300,
+                messages=[{"role": "user", "content": prompt}]
+            )
+        )
+        return response.choices[0].message.content
+
+    async def _call_anthropic(self, prompt: str) -> str:
+        """Call Anthropic API"""
+        message = self.client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return message.content[0].text
     
     def _interpret_with_keywords(self, query: str) -> Dict:
         """Fallback interpretation using keyword matching"""

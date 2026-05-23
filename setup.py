@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
 Setup script for DiscordRecords bot
-Helps with initial configuration and dependency checking
+Installs dependencies and creates config.json
 """
+import json
 import os
 import sys
 import subprocess
-import shutil
+
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def print_header(text):
@@ -21,38 +24,36 @@ def check_python_version():
     print_header("Checking Python Version")
     version = sys.version_info
     print(f"Python version: {version.major}.{version.minor}.{version.micro}")
-    
+
     if version.major < 3 or (version.major == 3 and version.minor < 8):
         print("❌ Python 3.8 or higher is required!")
         return False
-    
+
     print("✅ Python version is compatible")
     return True
 
 
 def check_ffmpeg():
-    """Check if FFmpeg is installed"""
-    print_header("Checking FFmpeg Installation")
-    
-    if shutil.which("ffmpeg") is not None:
-        print("✅ FFmpeg is installed")
+    """Check if bundled FFmpeg is present"""
+    print_header("Checking FFmpeg")
+
+    ffmpeg_path = os.path.join(SCRIPT_DIR, 'ffmpeg.exe')
+    if os.path.exists(ffmpeg_path):
+        print("✅ FFmpeg is bundled in project")
         return True
     else:
-        print("⚠️  FFmpeg is not installed or not in PATH")
-        print("\nFFmpeg is required for audio playback.")
-        print("Please install it:")
-        print("  Windows: Download from https://ffmpeg.org/download.html")
-        print("  macOS: brew install ffmpeg")
-        print("  Linux: sudo apt install ffmpeg")
+        print("⚠️  ffmpeg.exe not found in project folder")
+        print("  The bot expects ffmpeg.exe in the repo root.")
         return False
 
 
 def install_dependencies():
     """Install Python dependencies"""
     print_header("Installing Python Dependencies")
-    
+
+    req_path = os.path.join(SCRIPT_DIR, 'requirements.txt')
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", req_path])
         print("\n✅ Dependencies installed successfully")
         return True
     except subprocess.CalledProcessError:
@@ -60,92 +61,114 @@ def install_dependencies():
         return False
 
 
-def setup_env_file():
-    """Setup .env file from example"""
-    print_header("Setting up Environment File")
-    
-    if os.path.exists(".env"):
-        print("⚠️  .env file already exists")
+def setup_config():
+    """Create config.json interactively"""
+    print_header("Bot Configuration")
+
+    config_path = os.path.join(SCRIPT_DIR, 'config.json')
+
+    if os.path.exists(config_path):
+        print("⚠️  config.json already exists")
         response = input("Do you want to overwrite it? (y/N): ").strip().lower()
         if response != 'y':
-            print("Skipping .env setup")
+            print("Skipping config setup")
             return True
-    
-    if not os.path.exists(".env.example"):
-        print("❌ .env.example not found!")
-        return False
-    
-    # Copy example file
-    shutil.copy(".env.example", ".env")
-    print("✅ Created .env file from template")
-    
-    # Ask for Discord token
+
+    # Discord token (required)
+    print("You need a Discord Bot Token.")
+    print("Get one at: https://discord.com/developers/applications")
+    print("  1. Create an Application")
+    print("  2. Go to the Bot tab, click Reset Token, copy it")
+    discord_token = input("\nPaste your Discord Bot Token (required): ").strip()
+
+    if not discord_token:
+        print("⚠️  No token provided - you'll need to add it to config.json manually")
+
+    # Spotify (optional)
     print("\n" + "-"*60)
-    print("Let's configure your bot!")
+    print("Optional: Spotify Integration")
     print("-"*60)
-    
-    discord_token = input("\nEnter your Discord Bot Token (required): ").strip()
-    if discord_token:
-        with open(".env", "r") as f:
-            content = f.read()
-        content = content.replace("your_discord_bot_token_here", discord_token)
-        with open(".env", "w") as f:
-            f.write(content)
-        print("✅ Discord token configured")
-    else:
-        print("⚠️  No Discord token provided - you'll need to add it manually")
-    
-    # Ask about optional features
-    print("\n" + "-"*60)
-    print("Optional Features")
-    print("-"*60)
-    
-    setup_spotify = input("\nDo you want to setup Spotify integration? (y/N): ").strip().lower()
+    print("Lets the bot resolve Spotify links and search playlists.")
+    print("Requires a free Spotify Developer app (not a user account).")
+    print("Get credentials at: https://developer.spotify.com/dashboard")
+
+    spotify_id = ""
+    spotify_secret = ""
+    setup_spotify = input("\nSetup Spotify? (y/N): ").strip().lower()
     if setup_spotify == 'y':
-        client_id = input("Spotify Client ID: ").strip()
-        client_secret = input("Spotify Client Secret: ").strip()
-        
-        if client_id and client_secret:
-            with open(".env", "r") as f:
-                content = f.read()
-            content = content.replace("your_spotify_client_id_here", client_id)
-            content = content.replace("your_spotify_client_secret_here", client_secret)
-            with open(".env", "w") as f:
-                f.write(content)
+        spotify_id = input("Spotify Client ID: ").strip()
+        spotify_secret = input("Spotify Client Secret: ").strip()
+        if spotify_id and spotify_secret:
             print("✅ Spotify credentials configured")
-    
-    setup_ai = input("\nDo you want to setup AI language understanding? (y/N): ").strip().lower()
+
+    # AI (optional - OpenAI or Anthropic)
+    print("\n" + "-"*60)
+    print("Optional: AI Language Understanding")
+    print("-"*60)
+    print("Enables natural language interpretation of music requests.")
+    print("Supports OpenAI or Anthropic (pick one).")
+    print("  OpenAI:    https://platform.openai.com/api-keys")
+    print("  Anthropic: https://console.anthropic.com/")
+
+    openai_key = ""
+    anthropic_key = ""
+    setup_ai = input("\nSetup AI? (y/N): ").strip().lower()
     if setup_ai == 'y':
-        api_key = input("Anthropic API Key: ").strip()
-        
-        if api_key:
-            with open(".env", "r") as f:
-                content = f.read()
-            content = content.replace("your_anthropic_api_key_here", api_key)
-            with open(".env", "w") as f:
-                f.write(content)
-            print("✅ Anthropic API key configured")
-    
-    print("\n✅ Environment configuration complete!")
+        print("  1) OpenAI")
+        print("  2) Anthropic")
+        ai_choice = input("Which provider? (1/2): ").strip()
+        if ai_choice == '1':
+            openai_key = input("OpenAI API Key: ").strip()
+            if openai_key:
+                print("✅ OpenAI API key configured")
+        else:
+            anthropic_key = input("Anthropic API Key: ").strip()
+            if anthropic_key:
+                print("✅ Anthropic API key configured")
+
+    # Write config
+    config = {
+        "discord_token": discord_token,
+        "bot_prefix": "!",
+        "spotify": {
+            "client_id": spotify_id,
+            "client_secret": spotify_secret
+        },
+        "openai": {
+            "api_key": openai_key
+        },
+        "anthropic": {
+            "api_key": anthropic_key
+        },
+        "bot_settings": {
+            "default_volume": 50,
+            "max_queue_size": 100,
+            "timeout_seconds": 300,
+            "enable_auto_disconnect": True
+        }
+    }
+
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=4)
+
+    print("\n✅ config.json created")
     return True
 
 
 def print_next_steps():
     """Print next steps for the user"""
     print_header("Setup Complete!")
-    
+
     print("Next steps:")
-    print("1. Make sure FFmpeg is installed (required for audio)")
-    print("2. Review your .env file and add any missing credentials")
-    print("3. Invite your bot to your Discord server:")
+    print("1. Invite your bot to your Discord server:")
     print("   - Go to Discord Developer Portal")
-    print("   - Select your application")
-    print("   - Go to OAuth2 > URL Generator")
-    print("   - Select 'bot' scope and required permissions")
-    print("   - Use the generated URL to invite the bot")
-    print("4. Run the bot with: python bot.py")
-    print("\nFor detailed instructions, see README.md")
-    print("\n🎵 Happy music listening! 🎵\n")
+    print("   - Select your application > OAuth2 > URL Generator")
+    print("   - Scopes: bot, applications.commands")
+    print("   - Permissions: Send Messages, Connect, Speak")
+    print("   - Open the generated URL and authorize")
+    print("2. Run the bot:")
+    print("   python bot.py")
+    print("\n🎵 Happy listening! 🎵\n")
 
 
 def main():
@@ -156,27 +179,23 @@ def main():
     print("║            🎵 DiscordRecords Setup Wizard 🎵              ║")
     print("║                                                           ║")
     print("╚═══════════════════════════════════════════════════════════╝")
-    
-    # Check Python version
+
     if not check_python_version():
         sys.exit(1)
-    
-    # Check FFmpeg
-    ffmpeg_ok = check_ffmpeg()
-    
-    # Install dependencies
+
+    check_ffmpeg()
+
     if not install_dependencies():
         sys.exit(1)
-    
-    # Setup environment file
-    if not setup_env_file():
+
+    if not setup_config():
         sys.exit(1)
-    
-    # Print next steps
+
     print_next_steps()
-    
-    if not ffmpeg_ok:
-        print("⚠️  WARNING: FFmpeg is not installed. The bot will not work without it!")
+
+
+if __name__ == '__main__':
+    main()
 
 
 if __name__ == "__main__":

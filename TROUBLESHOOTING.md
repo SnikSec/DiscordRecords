@@ -1,386 +1,156 @@
 # 🔧 Troubleshooting Guide
 
-Common issues and their solutions for DiscordRecords.
-
-## Table of Contents
-- [Installation Issues](#installation-issues)
-- [Bot Connection Issues](#bot-connection-issues)
-- [Audio Playback Issues](#audio-playback-issues)
-- [API Integration Issues](#api-integration-issues)
-- [Command Issues](#command-issues)
-- [Performance Issues](#performance-issues)
+Common issues and solutions for DiscordRecords.
 
 ---
 
 ## Installation Issues
 
-### "Python not found" or "Python is not recognized"
+### "Python not found"
 
-**Problem:** Python is not installed or not in PATH.
+Python is not installed or not in PATH.
 
-**Solution:**
 1. Download Python 3.8+ from [python.org](https://python.org)
-2. During installation, check "Add Python to PATH"
-3. Restart your terminal/command prompt
+2. During install, check **"Add Python to PATH"**
+3. Restart your terminal
 4. Verify: `python --version`
 
 ### "pip: command not found"
 
-**Problem:** pip is not installed or not in PATH.
-
-**Solution:**
 ```bash
-# Try python -m pip instead
 python -m pip install -r requirements.txt
-
-# Or reinstall pip
-python -m ensurepip --upgrade
 ```
 
-### "FFmpeg not found" or "FFmpeg is not recognized"
+### "No module named 'discord'" (or other import errors)
 
-**Problem:** FFmpeg is not installed or not in PATH.
-
-**Solution:**
-
-**Windows:**
-1. Download FFmpeg from [ffmpeg.org](https://ffmpeg.org/download.html)
-2. Extract to `C:\ffmpeg`
-3. Add `C:\ffmpeg\bin` to your PATH:
-   - Search "Environment Variables" in Windows
-   - Edit "Path" under System Variables
-   - Add new entry: `C:\ffmpeg\bin`
-4. Restart terminal and verify: `ffmpeg -version`
-
-**macOS:**
+Dependencies not installed. Run setup again:
 ```bash
-brew install ffmpeg
+python setup.py
 ```
 
-**Linux:**
-```bash
-sudo apt update
-sudo apt install ffmpeg
-```
-
-### "No module named 'discord'"
-
-**Problem:** Dependencies not installed.
-
-**Solution:**
+Or manually:
 ```bash
 pip install -r requirements.txt
-
-# If that fails, try:
-pip install --upgrade pip
-pip install -r requirements.txt --no-cache-dir
 ```
 
 ---
 
 ## Bot Connection Issues
 
-### "DISCORD_TOKEN not found in environment variables"
+### "DISCORD_TOKEN not found" or bot won't start
 
-**Problem:** `.env` file missing or token not set.
+`config.json` is missing or the token field is empty.
 
-**Solution:**
-1. Ensure `.env` file exists (not `.env.example`)
-2. Check file contents:
-   ```
-   DISCORD_TOKEN=your_actual_token_here
-   ```
-3. No spaces around `=`
-4. Token should be a long string from Discord Developer Portal
+1. Run `python setup.py` to create it
+2. Or manually edit `config.json` and paste your token in the `discord_token` field
 
 ### "Improper token has been passed"
 
-**Problem:** Invalid Discord bot token.
+Your token is invalid or expired.
 
-**Solution:**
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Select your application
-3. Go to "Bot" tab
-4. Click "Reset Token"
-5. Copy the new token
-6. Update `.env` file with new token
+2. Select your app → Bot tab → **Reset Token**
+3. Copy the new token into `config.json`
 
 ### Bot appears offline in Discord
 
-**Problem:** Bot not running or connection failed.
-
-**Solution:**
-1. Check console for errors
-2. Verify token is correct
-3. Check internet connection
-4. Ensure bot has proper intents enabled:
+1. Make sure `python bot.py` is running without errors in the console
+2. Verify you enabled these intents in the Developer Portal:
    - Message Content Intent
    - Server Members Intent
    - Presence Intent
 
 ### Bot doesn't respond to commands
 
-**Problem:** Missing permissions or wrong prefix.
-
-**Solution:**
-1. Check command prefix (default: `!`)
-2. Verify in `.env`: `BOT_PREFIX=!`
-3. Ensure bot has "Send Messages" permission
-4. Check bot role position (should be above roles it needs to interact with)
-5. Try mentioning bot: `@BotName play music`
+1. Check the prefix — default is `!` (set in `config.json` under `bot_prefix`)
+2. Ensure the bot has **Send Messages** permission in the channel
+3. Try `!help_music` to confirm it's alive
 
 ---
 
 ## Audio Playback Issues
 
-### Bot joins but no audio plays
+### Bot joins voice channel but no audio plays
 
-**Problem:** FFmpeg issue or audio configuration problem.
-
-**Solution:**
-1. Verify FFmpeg: `ffmpeg -version`
-2. Check bot has "Speak" permission
-3. Set volume: `!volume 50`
-4. Try a different song
-5. Check console for error messages
+1. Check bot has **Speak** permission in the voice channel
+2. Try `!volume 50` to make sure volume isn't at zero
+3. Check the console for error messages
+4. Verify `ffmpeg.exe` exists in the project root folder
 
 ### "You need to be in a voice channel"
 
-**Problem:** User not in voice channel or bot can't detect it.
-
-**Solution:**
-1. Join a voice channel first
-2. Then use `!play` command
-3. Ensure voice channel is not full
-4. Check bot has "Connect" permission for that channel
+You must join a voice channel first, then type `!play`.
 
 ### Audio cuts out or stutters
 
-**Problem:** Network issues or CPU overload.
+1. Check your internet connection
+2. Try a different song
+3. Restart the bot (`Ctrl+C`, then `python bot.py` again)
 
-**Solution:**
-1. Check internet connection speed
-2. Try lower volume: `!volume 30`
-3. Close other applications
-4. Choose a different music source
-5. Restart the bot
+### "Failed to play audio" or FFmpeg errors
 
-### "Failed to play audio" error
-
-**Problem:** yt-dlp or FFmpeg issue.
-
-**Solution:**
 ```bash
-# Update yt-dlp
+# Update yt-dlp (YouTube changes frequently)
 pip install --upgrade yt-dlp
-
-# Reinstall FFmpeg
-# Windows: Download fresh copy
-# macOS: brew reinstall ffmpeg
-# Linux: sudo apt install --reinstall ffmpeg
 ```
 
-### Bot plays but volume is very low
-
-**Problem:** Volume setting too low.
-
-**Solution:**
-```
-!volume 100
-```
-
-Also check:
-- Discord user volume slider
-- System volume
-- Voice channel volume settings
+Also confirm `ffmpeg.exe` is in the project root (it should be bundled with the repo).
 
 ---
 
-## API Integration Issues
+## Spotify Issues
 
-### Spotify features not working
+### "Spotify credentials not found - Spotify features disabled"
 
-**Problem:** Invalid credentials or API issue.
+This is normal if you skipped Spotify setup. The bot works fine with YouTube only.
 
-**Solution:**
-1. Verify credentials in `.env`:
-   ```
-   SPOTIFY_CLIENT_ID=your_id
-   SPOTIFY_CLIENT_SECRET=your_secret
-   ```
-2. Check credentials at [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-3. Ensure both ID and Secret are from the same app
-4. Look for errors in console
-5. Bot will fall back to YouTube if Spotify fails
+To enable Spotify:
+1. Get credentials at [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+2. Edit `config.json` and fill in `spotify.client_id` and `spotify.client_secret`
+3. Restart the bot
 
-### "AI language processing not enabled"
+### Spotify playlist not found
 
-**Problem:** Anthropic API key not set or invalid.
-
-**Solution:**
-1. This is optional - bot still works with keyword matching
-2. To enable AI:
-   - Get key from [Anthropic Console](https://console.anthropic.com/)
-   - Add to `.env`: `ANTHROPIC_API_KEY=your_key`
-   - Restart bot
-3. Check console for "✅ AI language processing enabled"
-
-### YouTube search returns no results
-
-**Problem:** yt-dlp issue or search query problem.
-
-**Solution:**
-```bash
-# Update yt-dlp
-pip install --upgrade yt-dlp
-
-# Try a direct YouTube URL instead
-!play https://youtube.com/watch?v=...
-```
-
-### Rate limiting errors
-
-**Problem:** Too many API requests.
-
-**Solution:**
-1. Wait a few minutes
-2. Use less frequent commands
-3. For Spotify: Check your API quota in developer dashboard
-4. Consider implementing caching (future feature)
+1. Make sure both Client ID and Secret are from the same app
+2. Check the console for specific error messages
+3. The bot will fall back to YouTube if Spotify fails
 
 ---
 
-## Command Issues
+## AI / Language Processing Issues
 
-### "Command not found"
+### "No AI API key found - Using basic keyword matching"
 
-**Problem:** Wrong command name or prefix.
+This is normal if you skipped AI setup. The bot uses keyword matching instead — still works for most requests.
 
-**Solution:**
-1. Check available commands: `!help_music`
-2. Verify prefix: `!` (default)
-3. Try aliases: `!p` instead of `!play`
+To enable AI (pick one provider):
 
-### Queue doesn't show anything
+**OpenAI:**
+1. Get a key at [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Edit `config.json` and fill in `openai.api_key`
+3. Restart the bot
 
-**Problem:** No songs in queue or empty queue.
-
-**Solution:**
-1. Add songs first: `!play some music`
-2. Wait for songs to download
-3. Check current song: `!nowplaying`
-
-### Skip command doesn't work
-
-**Problem:** Nothing playing or already at end of queue.
-
-**Solution:**
-1. Check if music is playing: `!nowplaying`
-2. Ensure queue has songs: `!queue`
-3. Use `!play` to add more songs
+**Anthropic:**
+1. Get a key at [Anthropic Console](https://console.anthropic.com/)
+2. Edit `config.json` and fill in `anthropic.api_key`
+3. Restart the bot
 
 ---
-
-## Performance Issues
-
-### Bot uses too much CPU
-
-**Problem:** FFmpeg or Python process consuming resources.
-
-**Solution:**
-1. Lower audio quality (modify ytdl_options in player.py)
-2. Limit queue size
-3. Restart bot regularly
-4. Use a dedicated server/VPS for 24/7 hosting
-
-### Bot memory usage increases over time
-
-**Problem:** Memory leak or queue buildup.
-
-**Solution:**
-1. Restart bot periodically
-2. Clear queue: `!stop`
-3. Limit maximum queue size in config
-4. Update to latest version
-
-### Slow command response
-
-**Problem:** Network latency or API delays.
-
-**Solution:**
-1. Check internet connection
-2. Use faster hosting (VPS instead of home computer)
-3. Consider geographic proximity to Discord servers
-4. Enable caching (future feature)
-
----
-
-## Advanced Debugging
-
-### Enable Debug Logging
-
-Add to bot.py:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-### Check Dependencies
-
-```bash
-pip list | grep -E "discord|spotipy|yt-dlp|anthropic"
-```
-
-### Test Individual Components
-
-```python
-# Test Spotify
-python -c "from services.spotify_service import SpotifyService; s = SpotifyService(); print(s.enabled)"
-
-# Test YouTube
-python -c "from services.youtube_service import YouTubeService; y = YouTubeService()"
-```
-
-### Common Error Codes
-
-| Error | Meaning | Solution |
-|-------|---------|----------|
-| 401 | Unauthorized | Check API credentials |
-| 403 | Forbidden | Check permissions |
-| 404 | Not Found | Invalid URL or ID |
-| 429 | Rate Limited | Wait and retry |
-| 500 | Server Error | Try again later |
-
----
-
-## Still Need Help?
-
-1. **Check console output** - Most errors are logged there
-2. **Read error messages carefully** - They often tell you what's wrong
-3. **Search existing issues** on GitHub
-4. **Create a new issue** with:
-   - Your OS and Python version
-   - Complete error message
-   - Steps to reproduce
-   - What you've already tried
 
 ## Quick Diagnostics Checklist
 
-Run through this list:
-- [ ] Python 3.8+ installed? (`python --version`)
-- [ ] FFmpeg installed? (`ffmpeg -version`)
-- [ ] Dependencies installed? (`pip list`)
-- [ ] `.env` file exists and has valid token?
-- [ ] Bot is online in Discord?
-- [ ] Bot has proper permissions?
-- [ ] You're in a voice channel?
-- [ ] Internet connection working?
-- [ ] Console shows errors?
+- [ ] Python 3.8+? (`python --version`)
+- [ ] `config.json` exists with a valid Discord token?
+- [ ] `ffmpeg.exe` in project folder?
+- [ ] Dependencies installed? (`pip list | findstr discord`)
+- [ ] Bot intents enabled in Developer Portal?
+- [ ] Bot has Send Messages + Connect + Speak permissions?
+- [ ] You're in a voice channel when using `!play`?
 
 ---
 
-**Most issues can be solved by:**
-1. Checking the console output
-2. Verifying all credentials
-3. Ensuring FFmpeg is installed
-4. Updating dependencies: `pip install --upgrade -r requirements.txt`
+## Still Stuck?
+
+1. Check the console output — most errors are logged there
+2. Search existing GitHub issues
+3. Create a new issue with: your OS, Python version, the full error message, and what you tried

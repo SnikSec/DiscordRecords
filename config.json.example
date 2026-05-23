@@ -5,6 +5,9 @@
         "client_id": "",
         "client_secret": ""
     },
+    "openai": {
+        "api_key": ""
+    },
     "anthropic": {
         "api_key": ""
     },

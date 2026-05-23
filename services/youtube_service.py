@@ -78,6 +78,44 @@ class YouTubeService:
         except Exception as e:
             print(f"Error getting YouTube video info: {e}")
             return None
+
+    async def search_playlist(self, query: str, limit: int = 20) -> Optional[list]:
+        """
+        Search YouTube for a playlist and return its video URLs.
+
+        Args:
+            query: Search query for playlist
+            limit: Max number of tracks to return
+
+        Returns:
+            List of video URLs or None if not found
+        """
+        try:
+            ytdl_options = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True,
+                'default_search': 'ytsearch',
+            }
+
+            with yt_dlp.YoutubeDL(ytdl_options) as ytdl:
+                # Search for playlist
+                search_query = f"ytsearch5:{query} playlist"
+                info = ytdl.extract_info(search_query, download=False)
+
+                if 'entries' not in info or not info['entries']:
+                    return None
+
+                # Find a result that looks like a playlist or long mix, or just return top results
+                urls = []
+                for entry in info['entries'][:limit]:
+                    if entry and entry.get('id'):
+                        urls.append(f"https://www.youtube.com/watch?v={entry['id']}")
+
+                return urls if urls else None
+        except Exception as e:
+            print(f"Error searching YouTube playlist: {e}")
+            return None
     
     async def search_playlist(self, query: str) -> Optional[str]:
         """

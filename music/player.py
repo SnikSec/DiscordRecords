@@ -3,12 +3,16 @@ Music Player Module
 Handles music playback, queue management, and audio streaming
 """
 import asyncio
+import os
 import discord
 from discord.ext import commands
 from typing import Optional, Dict, List
 from services.spotify_service import SpotifyService
 from services.youtube_service import YouTubeService
 import yt_dlp
+
+# Use local ffmpeg bundled with the repo
+FFMPEG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'ffmpeg.exe')
 
 
 class Song:
@@ -113,25 +117,50 @@ class MusicPlayer:
             
             # Handle different query types
             if source == 'spotify' and query_type == 'playlist':
-                # Get Spotify playlist
-                await ctx.send(f"🔍 Fetching Spotify playlist...")
-                tracks = await self.spotify.get_playlist_tracks(search_query)
+                # Search Spotify for playlist by name, then resolve tracks via YouTube
+                if self.spotify.enabled:
+                    await ctx.send(f"🔍 Searching Spotify playlists for: {search_query}")
+                    playlist_info = await self.spotify.search_playlist(search_query)
+                    
+                    if playlist_info:
+                        await ctx.send(f"📋 Found playlist: **{playlist_info['name']}** ({playlist_info['tracks_total']} tracks)")
+                        tracks = await self.spotify.get_playlist_tracks(playlist_info['id'])
+                        
+                        for track in tracks[:20]:  # Limit to 20 songs
+                            yt_url = await self.youtube.search(f"{track['name']} {track['artist']}")
+                            if yt_url:
+                                song_info = await self.get_song_info(yt_url)
+                                if song_info:
+                                    song = Song(
+                                        title=f"{track['name']} - {track['artist']}",
+                                        url=song_info['url'],
+                                        duration=song_info['duration'],
+                                        thumbnail=song_info['thumbnail'],
+                                        requester=ctx.author,
+                                        source='spotify'
+                                    )
+                                    songs_to_add.append(song)
+                    else:
+                        await ctx.send("⚠️ No Spotify playlist found, trying YouTube...")
+                        # Fall through to YouTube playlist search below
                 
-                for track in tracks[:20]:  # Limit to 20 songs
-                    # Search YouTube for each Spotify track
-                    yt_url = await self.youtube.search(f"{track['name']} {track['artist']}")
-                    if yt_url:
-                        song_info = await self.get_song_info(yt_url)
-                        if song_info:
-                            song = Song(
-                                title=song_info['title'],
-                                url=song_info['url'],
-                                duration=song_info['duration'],
-                                thumbnail=song_info['thumbnail'],
-                                requester=ctx.author,
-                                source='spotify'
-                            )
-                            songs_to_add.append(song)
+                # If Spotify disabled or no results, try YouTube playlist search
+                if not songs_to_add:
+                    urls = await self.youtube.search_playlist(search_query)
+                    if urls:
+                        await ctx.send(f"🔍 Queuing {len(urls)} songs from YouTube...")
+                        for url in urls:
+                            song_info = await self.get_song_info(url)
+                            if song_info and 'entries' not in song_info:
+                                song = Song(
+                                    title=song_info['title'],
+                                    url=song_info['url'],
+                                    duration=song_info['duration'],
+                                    thumbnail=song_info['thumbnail'],
+                                    requester=ctx.author,
+                                    source='youtube'
+                                )
+                                songs_to_add.append(song)
             
             elif source == 'spotify' and query_type == 'search':
                 # Search Spotify and play on YouTube
@@ -151,6 +180,42 @@ class MusicPlayer:
                                 thumbnail=song_info['thumbnail'],
                                 requester=ctx.author,
                                 source='spotify'
+                            )
+                            songs_to_add.append(song)
+                
+                # Fallback to YouTube if Spotify didn't find anything
+                if not songs_to_add:
+                    await ctx.send("⚠️ Not found on Spotify, searching YouTube...")
+                    url = await self.youtube.search(search_query)
+                    if url:
+                        song_info = await self.get_song_info(url)
+                        if song_info:
+                            song = Song(
+                                title=song_info['title'],
+                                url=song_info['url'],
+                                duration=song_info['duration'],
+                                thumbnail=song_info['thumbnail'],
+                                requester=ctx.author,
+                                source='youtube'
+                            )
+                            songs_to_add.append(song)
+
+            elif query_type == 'playlist':
+                # YouTube playlist search by name
+                await ctx.send(f"🔍 Searching YouTube playlists for: {search_query}")
+                urls = await self.youtube.search_playlist(search_query)
+                if urls:
+                    await ctx.send(f"📋 Queuing {len(urls)} songs...")
+                    for url in urls:
+                        song_info = await self.get_song_info(url)
+                        if song_info and 'entries' not in song_info:
+                            song = Song(
+                                title=song_info['title'],
+                                url=song_info['url'],
+                                duration=song_info['duration'],
+                                thumbnail=song_info['thumbnail'],
+                                requester=ctx.author,
+                                source='youtube'
                             )
                             songs_to_add.append(song)
             
@@ -259,7 +324,7 @@ class MusicPlayer:
         
         try:
             # Create audio source
-            audio_source = discord.FFmpegPCMAudio(song.url, **self.ffmpeg_options)
+            audio_source = discord.FFmpegPCMAudio(song.url, executable=FFMPEG_PATH, **self.ffmpeg_options)
             audio_source = discord.PCMVolumeTransformer(audio_source, volume=self.get_volume(guild_id))
             
             # Play the song

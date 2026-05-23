@@ -3,14 +3,36 @@ DiscordRecords - AI-Powered Music Bot
 Main bot file with Discord integration
 """
 import os
+import json
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 from music.player import MusicPlayer
 from ai.language_processor import LanguageProcessor
 
-# Load environment variables
+# Load environment variables from .env first
 load_dotenv()
+
+# Load config.json and set env vars for any values not already set
+config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+if os.path.exists(config_path):
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    if config.get('discord_token') and not os.getenv('DISCORD_TOKEN'):
+        os.environ['DISCORD_TOKEN'] = config['discord_token']
+    if config.get('bot_prefix') and not os.getenv('BOT_PREFIX'):
+        os.environ['BOT_PREFIX'] = config['bot_prefix']
+    spotify = config.get('spotify', {})
+    if spotify.get('client_id') and not os.getenv('SPOTIFY_CLIENT_ID'):
+        os.environ['SPOTIFY_CLIENT_ID'] = spotify['client_id']
+    if spotify.get('client_secret') and not os.getenv('SPOTIFY_CLIENT_SECRET'):
+        os.environ['SPOTIFY_CLIENT_SECRET'] = spotify['client_secret']
+    openai_cfg = config.get('openai', {})
+    if openai_cfg.get('api_key') and not os.getenv('OPENAI_API_KEY'):
+        os.environ['OPENAI_API_KEY'] = openai_cfg['api_key']
+    anthropic_cfg = config.get('anthropic', {})
+    if anthropic_cfg.get('api_key') and not os.getenv('ANTHROPIC_API_KEY'):
+        os.environ['ANTHROPIC_API_KEY'] = anthropic_cfg['api_key']
 
 # Bot setup with proper intents
 intents = discord.Intents.default()
