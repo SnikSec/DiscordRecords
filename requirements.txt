@@ -2,7 +2,6 @@
 
 # Core Dependencies
 discord.py==2.3.2
-python-dotenv==1.0.0
 
 # Audio Processing
 yt-dlp==2023.12.30

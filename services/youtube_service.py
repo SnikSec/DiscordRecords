@@ -16,30 +16,44 @@ class YouTubeService:
             'quiet': True,
             'no_warnings': True,
             'default_search': 'ytsearch',
-            'extract_flat': True  # Don't download, just get info
+            'extract_flat': True,  # Don't download, just get info
+            'nocheckcertificate': True,
         }
     
-    async def search(self, query: str, limit: int = 1) -> Optional[str]:
+    async def search(self, query: str, limit: int = 5, music_only: bool = True) -> Optional[str]:
         """
         Search YouTube for a video
         
         Args:
             query: Search query
-            limit: Number of results to return (default 1)
+            limit: Number of results to fetch (picks first valid one)
+            music_only: If True, search YouTube Music instead of regular YouTube
             
         Returns:
             Video URL or None if not found
         """
         try:
             with yt_dlp.YoutubeDL(self.ytdl_options) as ytdl:
-                # Search YouTube
+                # Use YouTube Music search for music content
+                if music_only:
+                    search_query = f"https://music.youtube.com/search?q={query}"
+                    try:
+                        info = ytdl.extract_info(search_query, download=False)
+                        if 'entries' in info and info['entries']:
+                            for video in info['entries']:
+                                if video and video.get('id'):
+                                    return f"https://www.youtube.com/watch?v={video['id']}"
+                    except Exception:
+                        pass  # Fall through to regular YouTube search
+                
+                # Fallback to regular YouTube search
                 search_query = f"ytsearch{limit}:{query}"
                 info = ytdl.extract_info(search_query, download=False)
                 
                 if 'entries' in info and info['entries']:
-                    # Return the first result URL
-                    video = info['entries'][0]
-                    return f"https://www.youtube.com/watch?v={video['id']}"
+                    for video in info['entries']:
+                        if video and video.get('id'):
+                            return f"https://www.youtube.com/watch?v={video['id']}"
                 
                 return None
         except Exception as e:
@@ -61,6 +75,7 @@ class YouTubeService:
                 'format': 'bestaudio/best',
                 'quiet': True,
                 'no_warnings': True,
+                'nocheckcertificate': True,
             }
             
             with yt_dlp.YoutubeDL(ytdl_options) as ytdl:

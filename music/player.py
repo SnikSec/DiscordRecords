@@ -103,9 +103,20 @@ class MusicPlayer:
             # Check if we need to join the voice channel
             if not ctx.voice_client:
                 if ctx.author.voice:
-                    await ctx.author.voice.channel.connect()
+                    try:
+                        await ctx.author.voice.channel.connect(self_deaf=True, timeout=15.0)
+                    except Exception as e:
+                        await ctx.send(f"❌ Failed to connect to voice channel: {e}")
+                        return
                 else:
                     await ctx.send("❌ You need to be in a voice channel!")
+                    return
+            elif not ctx.voice_client.is_connected():
+                await ctx.voice_client.disconnect(force=True)
+                try:
+                    await ctx.author.voice.channel.connect(self_deaf=True, timeout=15.0)
+                except Exception as e:
+                    await ctx.send(f"❌ Failed to reconnect to voice channel: {e}")
                     return
             
             # Determine source preference
