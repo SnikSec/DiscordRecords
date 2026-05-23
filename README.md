@@ -44,7 +44,7 @@ An AI-powered Discord music bot that understands natural language requests and p
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
 2. Click **New Application** → name it → go to the **Bot** tab
-3. Click **Reset Token** → copy it (you'll paste it during setup)
+3. Click **Reset Token** → copy it (you'll paste it during setup)https://www.youtube.com/watch?v=vGfJeW_CcFY
 4. Enable **Message Content Intent**, **Server Members Intent**, and **Presence Intent**
 5. Go to **OAuth2 → URL Generator**, select scopes `bot` + `applications.commands`, permissions: Send Messages, Connect, Speak
 6. Open the generated URL to invite the bot to your server
@@ -74,6 +74,8 @@ Join a voice channel and type `!play lofi hip hop` — that's it.
 | Command | Aliases | Description | Example |
 |---------|---------|-------------|---------|
 | `!play <query>` | `!p` | Play music using natural language | `!play DnD tavern music` |
+| `!background <theme>` | `!bg` | Set background music (lower priority) | `!background chill lofi` |
+| `!background stop` | — | Stop background music | `!background stop` |
 | `!pause` | — | Pause current playback | `!pause` |
 | `!resume` | — | Resume paused playback | `!resume` |
 | `!skip` | `!next` | Skip to next song | `!skip` |
@@ -153,6 +155,9 @@ All configuration lives in `config.json` (created by `setup.py`):
         "client_id": "",
         "client_secret": ""
     },
+    "openai": {
+        "api_key": ""
+    },
     "anthropic": {
         "api_key": ""
     },
@@ -166,7 +171,7 @@ All configuration lives in `config.json` (created by `setup.py`):
 ```
 
 ### Without AI (Basic Mode)
-If no Anthropic API key is provided, the bot uses keyword-based matching — still works great for most requests.
+If no Anthropic or OpenAI API key is provided, the bot uses keyword-based matching — still works great for most requests.
 
 ### Without Spotify
 If no Spotify credentials are provided, the bot uses YouTube exclusively — still fully functional.

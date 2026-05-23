@@ -46,6 +46,25 @@ def check_ffmpeg():
         print("  The bot expects ffmpeg.exe in the repo root.")
         return False
 
+def check_deno():
+    """Check if Deno JavaScript runtime is installed (required by yt-dlp)"""
+    print_header("Checking Deno (JavaScript Runtime)")
+
+    try:
+        result = subprocess.run(['deno', '--version'], capture_output=True, text=True)
+        if result.returncode == 0:
+            version_line = result.stdout.strip().split('\n')[0]
+            print(f"\u2705 Deno is installed ({version_line})")
+            return True
+    except FileNotFoundError:
+        pass
+
+    print("\u26a0\ufe0f  Deno is not installed")
+    print("  yt-dlp requires Deno to extract YouTube videos.")
+    print("  Install it with: winget install DenoLand.Deno")
+    print("  Or visit: https://deno.land/")
+    print("  After installing, restart your terminal.")
+    return False
 
 def install_dependencies():
     """Install Python dependencies"""
@@ -184,6 +203,7 @@ def main():
         sys.exit(1)
 
     check_ffmpeg()
+    check_deno()
 
     if not install_dependencies():
         sys.exit(1)
